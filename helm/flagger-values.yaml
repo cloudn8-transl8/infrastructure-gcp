@@ -1,0 +1,3 @@
+---
+meshProvider: ""
+metricsServer: "http://prometheus-kube-prometheus-prometheus.default.svc:9090"
