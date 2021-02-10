@@ -1,0 +1,31 @@
+---
+# Service to expose metrics for prometheus
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-service
+  labels:
+    app: metrics
+spec:
+  selector:
+    app: ingress-gateway
+  ports:
+  - name: metrics
+    protocol: TCP
+    port: 9102
+    targetPort: 9102
+
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: IngressGateway
+metadata:
+  name: ingress-gateway
+spec:
+  listeners:
+    - port: 80
+      protocol: http
+      services:
+        - name: api
+          hosts: ['api.dev.translate.demo.gs']
+        - name: web
+          hosts: ['web.dev.translate.demo.gs']

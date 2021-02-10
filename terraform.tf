@@ -21,12 +21,38 @@ terraform {
   required_version = ">= 0.13.5"
 }
 
+# Change these settings to your own terraform cloud account
+terraform {
+  backend "remote" {
+    hostname = "app.terraform.io"
+    organization = "niccorp"
+
+    workspaces {
+      name = "infrastructure-gcp"
+    }
+  }
+}
+
 # Set the environment variables GOOGLE_PROJECT AND GOOGLEG_REGION
 provider "google" {}
 
 resource "google_service_account" "default" {
   account_id   = "service-account-id"
   display_name = "Service Account for GKE cluster"
+}
+
+# Store key as a K8s secret
+resource "google_service_account_key" "mykey" {
+  service_account_id = google_service_account.default.name
+}
+
+resource "kubernetes_secret" "google-application-credentials" {
+  metadata {
+    name = "google-application-credentials"
+  }
+  data = {
+    "credentials.json" = base64decode(google_service_account_key.mykey.private_key)
+  }
 }
 
 resource "google_container_cluster" "mycluster" {

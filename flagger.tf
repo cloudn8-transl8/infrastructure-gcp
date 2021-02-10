@@ -13,17 +13,23 @@ resource "helm_release" "flagger" {
 resource "kubectl_manifest" "flagger-crd-alert-provider" {
   depends_on = [google_container_node_pool.mycluster]
   provider = kubectl
-  yaml_body = file("./flagger-crds/flagger-crd-alert-provider.yaml")
+  yaml_body = file("./flagger/flagger-crd-alert-provider.yaml")
 }
 
 resource "kubectl_manifest" "flagger-crd-canaries" {
   depends_on = [google_container_node_pool.mycluster]
   provider = kubectl
-  yaml_body = file("./flagger-crds/flagger-crd-canaries.yaml")
+  yaml_body = file("./flagger/flagger-crd-canaries.yaml")
 }
 
 resource "kubectl_manifest" "flagger-crd-metric-template" {
   depends_on = [google_container_node_pool.mycluster]
   provider = kubectl
-  yaml_body = file("./flagger-crds/flagger-crd-metric-template.yaml")
+  yaml_body = file("./flagger/flagger-crd-metric-template.yaml")
+}
+
+resource "kubectl_manifest" "flagger-metrics" {
+  depends_on = [google_container_node_pool.mycluster]
+  provider = kubectl
+  yaml_body = file("./flagger/flagger-metrics.yaml")
 }

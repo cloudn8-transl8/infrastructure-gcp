@@ -41,3 +41,28 @@ resource "helm_release" "grafana" {
     file("./helm/grafana-values.yaml")
   ]
 }
+
+resource "kubernetes_service" "grafana" {
+  metadata {
+    name = "grafana-ingress"
+  }
+  spec {
+    selector = {
+      "app.kubernetes.io/instance" = "grafana"
+      "app.kubernetes.io/name" = "grafana"
+    }
+    
+    port {
+      port        = 80
+      target_port = 3000
+    }
+
+    type = "LoadBalancer"
+  }
+}
+
+resource "kubectl_manifest" "prometheus-config" {
+  depends_on = [helm_release.prometheus]
+  provider = kubectl
+  yaml_body = file("./config/prometheus.yaml")
+}

@@ -55,3 +55,6 @@ ingressGateways:
     - name: ingress-gateway
       service:
         type: LoadBalancer
+        ports:
+          - port: 80
+          - port: 443

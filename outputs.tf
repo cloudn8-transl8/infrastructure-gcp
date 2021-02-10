@@ -59,3 +59,8 @@ output "ingress_ip" {
 
 }
 
+output "grafana" {
+
+  value = kubernetes_service.grafana.load_balancer_ingress.0.ip
+
+}
