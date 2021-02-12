@@ -1,0 +1,10 @@
+---
+apiVersion: flagger.app/v1beta1
+kind: AlertProvider
+metadata:
+  name: on-call
+  namespace: default
+spec:
+  type: discord
+  secretRef:
+    name: flagger-on-call-url

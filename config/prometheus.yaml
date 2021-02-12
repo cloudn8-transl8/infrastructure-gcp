@@ -18,3 +18,24 @@ spec:
   selector:
     matchLabels:
       app: metrics
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: envoy
+  namespace: default
+  labels:
+    release: prometheus
+spec:
+  jobLabel: envoy
+  endpoints:
+  - path: /stats/prometheus
+    port: metrics
+    interval: 15s
+  namespaceSelector:
+    matchNames:
+    - default
+  selector:
+    matchLabels:
+      app: envoy

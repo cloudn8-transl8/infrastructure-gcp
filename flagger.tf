@@ -1,3 +1,5 @@
+variable "discord_url" {}
+
 resource "helm_release" "flagger" {
   depends_on = [google_container_node_pool.mycluster]
   name       = "flagger"
@@ -32,4 +34,19 @@ resource "kubectl_manifest" "flagger-metrics" {
   depends_on = [google_container_node_pool.mycluster]
   provider = kubectl
   yaml_body = file("./flagger/flagger-metrics.yaml")
+}
+
+resource "kubectl_manifest" "flagger-alerts" {
+  depends_on = [google_container_node_pool.mycluster]
+  provider = kubectl
+  yaml_body = file("./flagger/flagger-alerts.yaml")
+}
+
+resource "kubernetes_secret" "flagger-discord-webhook" {
+  metadata {
+    name = "flagger-on-call-url"
+  }
+  data = {
+    "address" = var.discord_url
+  }
 }

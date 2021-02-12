@@ -40,60 +40,106 @@ resource "kubectl_manifest" "consul-ingress" {
   yaml_body = file("./config/ingress.yaml")
 }
 
-resource "kubernetes_config_map" "nginx" {
+resource "kubernetes_config_map" "envoy" {
   metadata {
-    name = "nginx-config"
+    name = "envoy-config"
   }
 
   data = {
-    "nginx.conf" = <<EOF
-events {
-  worker_connections  1024;  ## Default: 1024
-}
-
-http {
-    #...
-  upstream web {
-    server localhost:9090;
-  }
-  
-  upstream api {
-    server localhost:9091;
-  }
-
-  server {
-    listen 80;
-    server_name web.translate.demo.gs;
-    location / {
-      proxy_pass       http://web;
-      proxy_http_version 1.1;
-      proxy_set_header HOST $host;
-      proxy_set_header X-Real-IP $remote_addr;
-      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Proto $scheme;
-    }
-  }
-  
-  server {
-    listen 80;
-    server_name api.translate.demo.gs;
-    location / {
-      proxy_pass       http://api;
-      proxy_http_version 1.1;
-      proxy_set_header HOST $host;
-      proxy_set_header X-Real-IP $remote_addr;
-      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Proto $scheme;
-    }
-  }
-}
+    "envoy.yaml" = <<EOF
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 8080
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          codec_type: http1
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: frontend
+              domains:
+              - "web.translate.demo.gs"
+              retry_policy:
+                retry_on: "connect-failure,5xx"
+                num_retries: 5
+              virtual_clusters:
+                - name: web
+                  headers:
+                    - name: ":path"
+                      prefix_match: "/"
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: frontend
+            - name: backend
+              domains:
+              - "api.translate.demo.gs"
+              retry_policy:
+                retry_on: "connect-failure,5xx"
+                num_retries: 5
+              virtual_clusters:
+                - name: api
+                  headers:
+                    - name: ":path"
+                      prefix_match: "/"
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: api
+          http_filters:
+          - name: envoy.router
+            typed_config: {}
+  clusters:
+  - name: frontend
+    connect_timeout: 1.00s
+    type: strict_dns
+    lb_policy: round_robin
+    load_assignment:
+      cluster_name: frontend
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 9090
+                ipv4_compat: true
+  - name: api
+    connect_timeout: 0.25s
+    type: strict_dns
+    lb_policy: round_robin
+    load_assignment:
+      cluster_name: api
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 9091
+                ipv4_compat: true
+admin:
+  access_log_path: "/dev/null"
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 8006
 EOF
   }
 }
 
-resource "kubernetes_deployment" "nginx" {
+resource "kubernetes_deployment" "ingress" {
   metadata {
-    name = "nginx"
+    name = "ingress"
   }
 
   spec {
@@ -101,14 +147,14 @@ resource "kubernetes_deployment" "nginx" {
 
     selector {
       match_labels = {
-        app = "nginx"
+        app = "ingress"
       }
     }
 
     template {
       metadata {
         labels = {
-          app = "nginx"
+          app = "ingress"
         }
         annotations = {
           "consul.hashicorp.com/connect-inject" = "true"
@@ -118,12 +164,17 @@ resource "kubernetes_deployment" "nginx" {
 
       spec {
         container {
-          image = "nginx:1.7.8"
-          name  = "nginx"
+          image = "envoyproxy/envoy-alpine:v1.17.0"
+          name  = "envoy"
+          command = [
+            "/usr/local/bin/envoy",
+            "--config-path", "/etc/envoy/envoy.yaml",
+            "--base-id", "1",
+          ]
 
           liveness_probe {
             tcp_socket {
-              port = 80
+              port = 8080
             }
 
             initial_delay_seconds = 3
@@ -132,14 +183,14 @@ resource "kubernetes_deployment" "nginx" {
 
           volume_mount {
             name = "config"
-            mount_path = "/etc/nginx/"
+            mount_path = "/etc/envoy/"
           }
         }
 
         volume {
           name = "config"
           config_map {
-            name = kubernetes_config_map.nginx.metadata.0.name
+            name = kubernetes_config_map.envoy.metadata.0.name
           }
         }
       }
@@ -147,26 +198,26 @@ resource "kubernetes_deployment" "nginx" {
   }
 }
 
-resource "kubernetes_service" "nginx" {
+resource "kubernetes_service" "ingress" {
   metadata {
-    name = "nginx"
+    name = "ingress"
   }
   spec {
     selector = {
-      app = kubernetes_deployment.nginx.metadata.0.name
+      app = kubernetes_deployment.ingress.metadata.0.name
     }
     port {
       port        = 80
-      target_port = 80
+      target_port = 8080
     }
 
     type = "LoadBalancer"
   }
 }
 
-resource "kubernetes_service" "nginx-metrics" {
+resource "kubernetes_service" "ingress-consul-metrics" {
   metadata {
-    name = "nginx-metrics"
+    name = "ingress-consul-metrics"
     labels = {
       app = "metrics"
     }
@@ -174,12 +225,32 @@ resource "kubernetes_service" "nginx-metrics" {
 
   spec {
     selector = {
-      app = kubernetes_deployment.nginx.metadata.0.name
+      app = kubernetes_deployment.ingress.metadata.0.name
     }
     port {
       name = "metrics"
       port        = 9102
       target_port = 9102
+    }
+  }
+}
+
+resource "kubernetes_service" "ingress-envoy-metrics" {
+  metadata {
+    name = "ingress-envoy-metrics"
+    labels = {
+      app = "envoy"
+    }
+  }
+
+  spec {
+    selector = {
+      app = kubernetes_deployment.ingress.metadata.0.name
+    }
+    port {
+      name = "metrics"
+      port        = 9102
+      target_port = 8006
     }
   }
 }
