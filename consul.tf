@@ -26,12 +26,18 @@ resource "helm_release" "consul-smi" {
   depends_on = [helm_release.consul, helm_release.certmanager]
   name       = "consul-smi"
 
-  repository = "https://nicholasjackson.io/smi-controller-sdk/"
+  repository = "https://servicemeshinterface.github.io/smi-controller-sdk"
   chart      = "smi-controller"
   
   values = [
     file("./helm/consul-smi-controller.yaml")
   ]
+}
+
+resource "kubectl_manifest" "consul-defaults" {
+  depends_on = [helm_release.consul]
+  provider = kubectl
+  yaml_body = file("./config/consul-defaults.yaml")
 }
 
 resource "kubectl_manifest" "consul-ingress" {

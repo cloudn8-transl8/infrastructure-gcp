@@ -6,9 +6,15 @@ data "kubernetes_secret" "grafana" {
   }
 }
 
-data "kubernetes_service" "consul_gateway" {
+data "kubernetes_service" "ingress" {
   metadata {
-    name = "consul-ingress-gateway"
+    name = kubernetes_service.ingress.metadata[0].name
+  }
+}
+
+data "kubernetes_service" "grafana" {
+  metadata {
+    name = kubernetes_service.grafana.metadata[0].name
   }
 }
 
@@ -55,12 +61,12 @@ output "grafana_password" {
 
 output "ingress_ip" {
 
-  value = data.kubernetes_service.consul_gateway.load_balancer_ingress.0.ip
+  value = data.kubernetes_service.ingress.status.0.load_balancer.0.ingress.0.ip
 
 }
 
 output "grafana" {
 
-  value = kubernetes_service.grafana.load_balancer_ingress.0.ip
+  value = data.kubernetes_service.grafana.status.0.load_balancer.0.ingress.0.ip
 
 }

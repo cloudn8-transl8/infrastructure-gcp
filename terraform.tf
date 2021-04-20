@@ -2,11 +2,11 @@ terraform {
   required_providers {
     helm = {
       source = "hashicorp/helm"
-      version = "1.3.2"
+      version = "2.1.1"
     }
     kubernetes = {
       source = "hashicorp/kubernetes"
-      version = "1.13.3"
+      version = "2.1.0"
     }
     kubectl = {
       source  = "gavinbunney/kubectl"
@@ -14,11 +14,11 @@ terraform {
     }
     google = {
       source = "hashicorp/google"
-      version = "3.50.0"
+      version = "3.64.0"
     }
   }
 
-  required_version = ">= 0.13.5"
+  required_version = ">= 0.14.8"
 }
 
 # Change these settings to your own terraform cloud account
@@ -33,7 +33,7 @@ terraform {
   }
 }
 
-# Set the environment variables GOOGLE_PROJECT AND GOOGLEG_REGION
+# Set the environment variables GOOGLE_PROJECT AND GOOGLE_REGION
 provider "google" {}
 
 resource "google_service_account" "default" {
@@ -84,6 +84,12 @@ resource "google_container_node_pool" "mycluster" {
   location   = var.location
   cluster    = google_container_cluster.mycluster.name
   node_count = var.nodes
+
+  autoscaling {
+    min_node_count = var.nodes
+    max_node_count = var.nodes + 3
+
+  }
     
   max_pods_per_node = 110
 

@@ -4,8 +4,7 @@ resource "helm_release" "flagger" {
   depends_on = [google_container_node_pool.mycluster]
   name       = "flagger"
 
-  repository = "https://flagger.app"
-  chart      = "flagger"
+  chart      = "./flagger/helm"
   
   values = [
     file("./helm/flagger-values.yaml")

@@ -1,5 +1,6 @@
 variable "nodes" {
-  default = 3
+  description  = "Number of nodes per zone"
+  default = 1
 }
 
 variable "machine_type" {
@@ -7,7 +8,7 @@ variable "machine_type" {
 }
 
 variable "location" {
-  default = "europe-west1-b"
+  default = "europe-west1"
 }
 
 variable "name" {
